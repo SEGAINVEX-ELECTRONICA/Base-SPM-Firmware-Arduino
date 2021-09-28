@@ -20,14 +20,12 @@
 
 ## Librería para Arduino SparkFun_MMA8452Q_Arduino_Library-master, para utilizar un acelerómetro MMA8452Q 
 
-## [SOFTWARE DE PC](https://github.com/PatricioCoronado/Base-SPM-Java)
-Desarrollado en [Java](https://www.java.com/es/) con [Eclipse](https://www.eclipse.org/)
+## [SOFTWARE DE PC](https://github.com/PatricioCoronado/Base-SPM-Java) desarrollado en [Java](https://www.java.com/es/) con [Eclipse](https://www.eclipse.org/)
 
-## [SOFTWARE PARA TABLET](https://github.com/PatricioCoronado/Base-SPM-tablet)
-Desarrollado con [Android Studio 4.0.1](https://developer.android.com/studio?hl=es)
+## [SOFTWARE PARA TABLET](https://github.com/PatricioCoronado/Base-SPM-tablet) desarrollado con [Android Studio 4.0.1](https://developer.android.com/studio?hl=es)
 
 ## [MANUAL](https://github.com/SEGAINVEX-ELECTRONICA/Base_SPM_V3/blob/main/Manual/Manual_Base_SPM_V3.pdf)
-## 
+ 
 # IMÁGENES DEL PROYECTO
 ##
 ![Alt text](https://github.com/SEGAINVEX-ELECTRONICA/Base-SPM-Firmware-Arduino/blob/V1.3.2/ficheros/base_electronica.jpg "electrónica de la base")
