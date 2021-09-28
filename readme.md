@@ -1,6 +1,6 @@
 # UNIVERSIDAD AUTÓNOMA DE MADRID [SEGAINVEX-Electrónica](https://www.uam.es/uam/segainvex)
 # DESCRIPCIÓN
-## Firmware para la electrónica de la base del microscópio SPM, [ para la plataforma Arduino DUE.](https://store.arduino.cc/products/arduino-due?selectedStore=eu)## Desarrollado con [Visual Studio Code](https://code.visualstudio.com/) y [PlatformIO](https://platformio.org/) por [Patricio Coronado, ](https://patriciocoronadocollado.000webhostapp.com/) en [SEGAINVEX-Electrónica](https://www.uam.es/uam/segainvex) para el [Departamento de Física de la Materia Condensada de la UAM](https://www.fmc.uam.es/research/nano-spm-lab/)
+## Firmware para la electrónica de la base del microscópio SPM, [ para la plataforma Arduino DUE.](https://store.arduino.cc/products/arduino-due?selectedStore=eu) Desarrollado con [Visual Studio Code](https://code.visualstudio.com/) y [PlatformIO](https://platformio.org/) por [Patricio Coronado, ](https://patriciocoronadocollado.000webhostapp.com/) en [SEGAINVEX-Electrónica](https://www.uam.es/uam/segainvex) para el [Departamento de Física de la Materia Condensada de la UAM](https://www.fmc.uam.es/research/nano-spm-lab/)
 
 ## Cambios de esta versión respecto a la V1.2.1:
 ### Cambia el sensor de humedad temperatura por el BME280 controlado por I2C
