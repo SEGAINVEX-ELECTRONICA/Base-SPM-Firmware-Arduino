@@ -4,7 +4,7 @@
 	OT: 20190335, 20191136 
 	Proyecto: Programación de la Base SPM con Arduino DUE 
 	
-	Versión 1.3 16/05/2020
+	Versión 1.3.2 septiembre 2021
 	
 	Aplicación para placa PCB_A con el Arduino DUE
 	Patricio Coronado. Mayo de 2019
@@ -27,30 +27,27 @@
 	-4. En las partes críticas se ha sustituido digitalWrite
 		por una macro que cambia los pines 8 veces más rápido
 	-5. La frecuencia de paso (micropaso) ha subido de 90KHz
-		a 120KHz y hay margen para subirla.
+		a 100KHz y hay margen para subirla.
 	-6. Anulo la función del pin del DSP DSP_48V 
-	-7. La comunicación con el mando se hace por Bluetooth
+	-7. La comunicación con el mando (tablet o smartphone) se hace por Bluetooth
 	
 	mejoras sobre la versión 1_2:
 	
-	-1.	El sensor de humedad y temperatura va sobre I2C aunque
-		hay que seguir probando dispositios.
+	-1.	El sensor de humedad y temperatura es definitivamente BME280 
+		y va sobre I2C.
 		
-			
-	
-	Ultimas modificaciones (experimental):
+	Modificaciones en la versión 3_1
 	
 	-1.	He modificado las firmas de las cadenas. Ahora son dos mayúsculas 
 		salvo temperatura-humedad que no lo he cambiado por compatibilidad.
 	-2.	El envío periódico de fotodiodo y acelerómetro tiene un parámetro, 
 		el número de envios.
-	-3. El sensor AHT10 se maneja con el i2c Wire1 directamente sin librería.
-	-4  He añadido el sensor BME280 para sustituir al AHT10. Ahora los dos
+	-3  He añadido el sensor BME280 para sustituir al AHT10. Ahora los dos
 		sensores, acelerómetro y humedad/temperatura pueden ir en el mismo i2c
 		y van en el Wire. El Wire1 no se inicializa, asi el Serial3 está
 		disponible.
-	-5. He bajado el periodo de muestreo del fotodiodo a 400us (2,5KHz). 
-	-6. Los 48V se activan o desactivan desde el PC o Android (experimental)
+	-4. He bajado el periodo de muestreo del fotodiodo a 400us (2,5KHz). 
+	-5. Los 48V se activan o desactivan desde el PC o Android 
 	-7. He redefinido los pines DSP_CLK y DSP_48V. Así:	 
 		#define DSP_CLK A8 //cambiado, antes era 5.16/09/2020
 		#define DSP_48V A9// cambiado, antes era 4.16/09/2020
@@ -64,16 +61,10 @@ TO DO
 		según la base 9600 para la primera y 115200 el resto
 	
 
-	-1.	Quitar el código de los sensores de humedad y temperatura obsoletos
-	-2. El Probar el Serial3 (es incompatible con el uso del Wire1).
-	-3. Reconectar el Serial3 con el Serial. 
-	-4. Probar el Seria con un Bluetooth, se puede utilizar aunque
-		sea el utilizado por el programing port. 
-	-5.	Alimentar los sensores I2C con 3V3 voltios distintos del DUE.
-	-6. Utilizar el sensor BME280 sin librería 
+	-1. Utilizar el sensor BME280 sin librería 
 
 	
-	Ultimos cambios en el código 27/09/2020
+	Ultimos cambios en el código sep 2021
 */
 /**************************************************************************
 	Copyright © 2020 Patricio Coronado
@@ -90,22 +81,17 @@ TO DO
 	General Public License for more details.
     You  should have received a copy  of the GNU General Public License
     along with BaseSPM.c  If not, see <http://www.gnu.org/licenses/>
-***************************************************************************/	
-/*
-		
-	
-*/
+***********************************************************************/	
+
 /**********************************************************************/
 #include <Arduino.h>
 #include "DueTimer.h"//Necesario para usar los timers con facilidad
 #include <Wire.h>   //Para utilizar el I2C del acelerómetro y otros dipositivos
-#include "SHT1x.h" //Sensor de humedad temperatura SHT11
-#include "DHT.h"//Sensor de humedad temperatura DHT22
 #include "SparkFun_MMA8452Q.h"//acelerómetro MMA8452Q
-#include "Adafruit_Sensor.h"
-#include "PacoAdafruit_BME280.h"//Modificado por mi
+#include "Adafruit_Sensor.h" //La utiliza PacoAdafruit_BME280.h
+#include "PacoAdafruit_BME280.h"//Modificado para leer más rápido
 #include "SegaSCPI.h"
-#include "BaseSPM_V1_3_1.h"//Constantes, tipos, prototipos y variables globales
+#include "BaseSPM_V1_3_2.h"//Constantes, tipos, prototipos y variables globales
 /***********************************************************************
  * 							SETUP
  ***********************************************************************/
@@ -125,8 +111,7 @@ void setup()
 		pinMode(TEST_SENSORHT,OUTPUT);
 		pinMode(TEST_ACELEROMETRO,OUTPUT);
 		pinMode(TEST_FOTODIODO,OUTPUT);
-		pinMode(TEST_ADC,OUTPUT);
-		pinMode(TEST_CLK,OUTPUT);
+		
 		//Leds
 		pinMode(LED_BUILTIN,OUTPUT);     
 		pinMode(LED0,OUTPUT); 
@@ -142,21 +127,9 @@ void setup()
 		pinMode(RELE_Z2,OUTPUT);     
 		pinMode(RELE_Z1,OUTPUT);
 		pinMode(RELE_HD,OUTPUT);
-		//Acelerómetros     
-		pinMode(I2_1,OUTPUT);//Son interrupciones de acelerómetro que no se utilizan
-		pinMode(I1_1,OUTPUT);//de momento
-		//pinMode(I2_2,OUTPUT); //Voy a utilizar el Serial2 para el bluethoot
-		//pinMode(I1_2,OUTPUT);
-		//Sensor humedad temperatura SHT11
-		pinMode(SEN_CLK,OUTPUT);
-		pinMode(SEN_DATA,INPUT);
-		// Infrarojo
-		pinMode(IR_DATA,INPUT);//No se utiliza
 		// Selección de motores en la cabeza
 		pinMode(MHD1,OUTPUT);
 		pinMode(MHD0,OUTPUT);
-		// Salida 48V
-		pinMode(SALIDA_48V,INPUT); //Entrada analógica para el ADC
 		//DSP-Dulcinea
 		pinMode(DSP_CLK,INPUT);//INPUT_PULLUP da problemas (ver cuaderno Patricio 9 pg 4)
 		pinMode(DSP_48V,INPUT);
@@ -167,6 +140,7 @@ void setup()
 		Estado_48V=true; desactiva_48V();//Desactiva el DC-DC de 48V
 		// Estado del módulo TMCM-090 por defecto
 		cambia_onda(OMEGA564);//Valor de onda por defecto y no se cambia
+		//cambia_onda(SINE1S85);//Valor para hacer pruebas
 		//Resolución y velocidad por defecto
 		cambia_frecuencia_resolucion(1,2048);//Frecuencia a 1KHz
 		//Motor seleccionado por defecto
@@ -176,7 +150,7 @@ void setup()
 		cambia_sentido(SUBIR);//Sentido inicial
 		Contador=0; //Contador de pasos. Se incrementa con cada step de clk interno Timer_CLK 
 		//Leds 4 y 5 a 0
-		LED4_0
+		LED4_0 //Macros para mover los pines más deprisa
 		LED5_0
 	}//Fin inicializa al estado por defecto de las  variables del sistema-----
 	{//Puertos serie Serial Serial1 y Serial2 ---------------------------------
@@ -188,33 +162,20 @@ void setup()
 	}// Fin puertos serie Serial Serial1 y Serial2 ---------------------------
 	{ // I2C, acelerómetro y sensor de temperatura AHT10-----------------------
 		//Se utiliza un i2c para el acelerómetro y otro para el AHT10 porque son incompatibles
-		Wire.begin();
+		Wire.begin();//Para los sensores
 		Wire.setClock(MAX_FREC_I2C);//Velocidad del I2C 0.4MHz 
 		#define I2C_ACC Wire //i2c del acelerómetro scl y sda
-		#define I2C_SENSOR_HT Wire //o Wire1 i2c para el sensor de humedad y temperatura
-		// Inicializar el Wire 1 solo si es necesario
-		//Wire1.begin(); 
-		//Wire1.setClock(MAX_FREC_I2C);//Velocidad del I2C 0.4MHz 
-		#ifdef SENSOR_AHT10
-			aht10Conectado = busca_aht10(); 
-		#endif
-		#ifdef SENSOR_BME280
-			statusBME280 = bme.begin(0x76,&I2C_SENSOR_HT);  
-		#endif
-		//I2C.setClock(NORMAL_FREC_I2C);//Velocidad del I2C 0.1MHz 
+		#define I2C_SENSOR_HT Wire //Wire i2c para el sensor de humedad y temperatura
+		statusBME280 = bme.begin(0x76,&I2C_SENSOR_HT);  
   		AcelerometroConectado = busca_acelerometro();//Si hay acelerómetro pone AcelerometroConectado a true
 	}
 	{// Convertidor AD, Timers e interrupciones externas ----------------------
-		// La interrupción del CLK_DSP se habilita solo si Frecuencia==0 en la función
-		// Que cambia la frecuencia
-		//Aumentaba la velocidad del ADC (ya no, Arduino lo cambió)
-		// REG_ADC_MR = (REG_ADC_MR & 0xFFF0F0FF) | 0x00020100;
+		// La interrupción del CLK_DSP se habilita solo si Frecuencia==0 en la función que cambia la frecuencia
 		analogReadResolution(12);//Resolución de los ADCs 12 bits
 		TIMER_CLK.attachInterrupt(timer_clk);//Timer para clk
 		TIMER_ADC.attachInterrupt(timer_ADC);
 		TIMER_FOTO_ACEL.attachInterrupt(timer_foto_acel);
-		//TIMER_ADC.start(TS_ADC_500us); //Arranca el timer del ADC
-		TIMER_ADC.start(TS_ADC_400us); //Arranca el timer del ADC FS=1/(4e-4)=2,5KHz
+		TIMER_ADC.start(TS_ADC_400us); //Arranca el timer del ADC FS=1/(4e-4)=2,5KHz. Otas opciones TS_ADC_300us y TS_ADC_200us
 		
 	}// Fin convertidor AD, Timers e interrupciones externas -----------------
 }
@@ -233,7 +194,7 @@ void loop()
 	marcha_paro_motor() poner en marcha motores
 	y no se activan los 48V y no se ponen en marcha motores.
 	 */
-	if(Estado_48V && !_DSP_48V) //Situación de funcionamiento normal.(Experimental)anular el pin DSP_48V
+	if(Estado_48V && !_DSP_48V) //Situación de funcionamiento normal. _DSP_48V forzado a 1 (Experimental)anular el pin DSP_48V
 	{
 		marcha_paro_motor(PARO);
 		desactiva_48V(); //(Experimental)aquí no llega porque fuerzo !_DSP_48V = 0
@@ -544,7 +505,7 @@ int cambia_motor(unsigned int numMotor)
  * **********************************************************************/
 void activa_48V(void)// Activa la fuente de 48V
 {		 
-	if(!_DSP_48V) return; //Si el bit del DSP está a 0, no se encienden los 48V
+	if(!_DSP_48V) return; //Si el bit del DSP está a 0, no se encienden los 48V (no se usa, está siempre forzado a 1)
 	 if(Estado_48V) return;//Si las llamada es para encender 48V y ya lo estan, sale.
 	 digitalWrite(P15V_ON,HIGH); //Pone 15V a la entrada de la fuete de 48V
 	 delay(RETARDO_ENCENDIDO1);//Espera antes de poner en marcha la fuente
@@ -589,11 +550,14 @@ void desactiva_48V(void)// Desactiva la fuente de 48V
 { 
 	// En principio solo vamos a trabajar con OMEGA564
 // NO SE PERMITEN CAMBIOS DE ONDA.......................	
+/*	
 	if(ModoOn!=OMEGA564) 
 	{	
 		BaseScpi.errorscpi(20);
 		return -1; 
 	}
+*/
+
 // SE TRABAJA SIEMPRE CON OMEGA564.....................
 	// Actualiza los pines de modo de onda
 	switch(ModoOn)
@@ -655,9 +619,9 @@ int cambia_frecuencia_resolucion(unsigned int Frec,unsigned int Res)
 			}
 		break;
 		case 512:
-			if(Frec>120)
+			if(Frec>MAXIMA_FRECUENCIA)
 			{
-				Frec = 120;
+				Frec = MAXIMA_FRECUENCIA;
 				BaseScpi.errorscpi(16);//Frecuencia ajustada
 			}
 		break;
@@ -708,7 +672,7 @@ int cambia_frecuencia_resolucion(unsigned int Frec,unsigned int Res)
 	}
 	if(depuracion)
 	{
-		debug("ejecutado cambio_frecuencia_resolucion\r\n");
+		debug("ejecutado con exito cambio_frecuencia_resolucion\r\n");
 		debug("Frecuencia = ");debug(Frecuencia);debug("\r\n");
 		debug("Periodo = ");debug(Periodo[Frecuencia]);debug("\r\n");	
 		debug("Resolucion =");debug(Resolucion);debug("\r\n");
@@ -764,26 +728,6 @@ bool busca_acelerometro(void)
 	if (Acelerometro.begin(I2C_ACC, 0x1d) == true) return true;
 	return false;
 }
-/**************************************************************************
-*	Busca e inicializa el sensor AHT10 en el I2C,
-	si está presente devuelve true, si no false.
-*************************************************************************/
-#ifdef SENSOR_AHT10
-bool busca_aht10(void)
-{
-	I2C_SENSOR_HT.beginTransmission(AHT10_ADD);
-    uint8_t comandoCalibracion[3]={0xE1, 0x08, 0x00};
-	I2C_SENSOR_HT.write(comandoCalibracion, 3);
-    I2C_SENSOR_HT.endTransmission();
-	delay(500);
- 	I2C_SENSOR_HT.requestFrom(AHT10_ADD, 1);
-    int8_t resultado = I2C_SENSOR_HT.read();
-    if((resultado & 0x68) == 0x08)
-    	return true;
-	else
-		 return false;
-}
-#endif
 /************************************************************************
         Fin del conjunto de funciones que tocan y/o programan las 
 		variable y los pines del sistema.
@@ -919,7 +863,7 @@ void pc_variables(void)
 		Actualiza el valor de la variable contador a un valor
 		entre 0 y CONTADOR_MAXIMO
 		Se ejecuta en 1.42ms
-		comando MOT:CO <contador>
+		Comando "MOT:CO <contador>""
  * **********************************************************************/
 void pc_contador(void)
 {
@@ -942,7 +886,7 @@ void pc_contador(void)
 		En cada step (del TimerCLK no del pin DSP_CLK) se descuenta un paso.
 		Cuando pasa de 1 a 0 se detiene el timerCLK.
 		Se ejecuta en 1.4ms
-		comando "MOT:AN <Pasos>"
+		Comando "MOT:AN <Pasos>"
  * **********************************************************************/
 void pc_anda_numero_de_pasos(void)
 {
@@ -987,7 +931,7 @@ void pc_marcha_paro(void)
 		Función para cambiar el sentido
 		Lee el parámetro sentido y si es correcto lo cambia
 		Se ejecuta en 1ms
-		comando "MOT:SE <Sentido>"
+		Comando "MOT:SE <Sentido>"
 ************************************************************************/
 void pc_sentido(void)
 {
@@ -1103,7 +1047,7 @@ void pc_onda(void)
 /************************************************************************
  * Funciones para hacer que envíe las señales del diodo cada 
  * 200ms y para que deje de hacerlo.
- * Comandos MOT:IFO inicia y MOT:FFO finaliza
+ * Comandos MOT:IFO <nº_de_muestras> inicia y MOT:FFO finaliza
  * la función de interrupción del timer es timer_foto_acel()
  * **********************************************************************/
 void pc_inicia_fotodiodo(void)
@@ -1114,11 +1058,11 @@ void pc_inicia_fotodiodo(void)
 		contadorEnvios=envios; //Inicaliza el contador de envios a realizar;
 	else contadorEnvios=1;//Si no envía el número de envios se realiza un solo envío;	
 	FotoAcel = FOTODIODO;
-	TIMER_FOTO_ACEL.start(T200ms);//200ms	
+	TIMER_FOTO_ACEL.start(T200ms);//Arranca el timer a 200ms	
 }
 void pc_fin_fotodiodo(void)
 {
-	TIMER_FOTO_ACEL.stop();
+	TIMER_FOTO_ACEL.stop();//Detiene el timer
 }
 /************************************************************************
  * Funciones para hacer que envíe las señales del acelerometro cada 
@@ -1135,51 +1079,20 @@ void pc_inicia_acelerometro(void)
 	else contadorEnvios=1;//Si no envía el número de envios se realiza 1	
 	FotoAcel = ACELEROMETRO;
 	
-	TIMER_FOTO_ACEL.start(T200ms);//100ms	
+	TIMER_FOTO_ACEL.start(T200ms);//Inicia el timer a 200ms	
 }
-void pc_fin_acelerometro(void)
+void pc_fin_acelerometro(void)//Detien el timer
 {
 	TIMER_FOTO_ACEL.stop();
-}
-/*************************************************************************
-		Envía las señales del fotodiodo al PC 
-		El comando se procesa en 1,2ms
-		Comando MOT:FOT?
- * **********************************************************************/
-void pc_fotodiodo(void)
-{
-	if(BaseScpi.FinComando[0]!='?')  
-	{
-		BaseScpi.errorscpi(4);//Parámetro inexistente
-		return;
-	}
-	char respuesta[64];
-	
-	float fl,fn,sum;
-	unsigned int fuerzaNormal,fuerzaLateral,suma;
-	
-	//Cálculo de valores
-	fuerzaNormal=FuerzaNormal.media();
-	fn=mFn*fuerzaNormal+b_fn;//Calibrado
-	//fn=mFotoDiodo*fuerzaNormal+bFotoDiodo; //Sin calibrar
-	fuerzaLateral=FuerzaLateral.media();
-	fl=mFl*fuerzaLateral+b_fl;//Calibrado
-	//fl=mFotoDiodo*fuerzaLateral+bFotoDiodo;//Sin calibrar
-	suma=Suma.media();
-	sum=mSum*suma+b_sum;//Calibrado
-	//sum=mFotoDiodo*suma+bFotoDiodo;//Sin calibrar
-	//Fin cálculo de valores
-	
-	sprintf(respuesta,"%s %.2f %.2f %.2f",FFOTODIODO,fn,fl,sum);
-	Println(respuesta);
 }
 /*************************************************************************
 		Lee el sensor de temperatura y humedad y lo envia al PC.
 		El sensor SHT11 está obsoleto.
 		Con el DHT-22 tarda 5,68ms el comando se procesa en 6,32ms.
 		Con el sensor AHT10 el  comando se procesa en 525us. Tiene el
-		inconveniente que no puede compartir el I2C.
-		Comando MOT:TH?
+		inconveniente que no puede compartir el I2C. 
+		El BME280 es el que se utiziza en la última versión.
+		Comando "MOT:TH?"
  * **********************************************************************/
 void pc_sensor_temperatura_humedad(void)
 {
@@ -1200,73 +1113,6 @@ void pc_sensor_temperatura_humedad(void)
 		TEST_SENSORHT_0 //digitalWrite(TEST_SENSORHT,LOW);	
 		return;
 	}
-	
-#ifdef SENSOR_SHT11
-	char Datos[128];
-	//SHT1x SHT11(SEN_DATA, SEN_CLK);
-	float Temperatura;
-	float Humedad;
-	Temperatura = SHT11.readTemperatureC();
-	Humedad = SHT11.readHumidity();
-	sprintf(Datos,"T%5.1f H%5.1f",Temperatura,Humedad);
-	//sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
-	// Envía valores por el puerto
-	Println(Datos)
-#endif
-#ifdef SENSOR_DHT22
-	char Datos[128];	
-	TIMER_ADC.stop();//Con el sensor DHT-22 se desactiva las interrupciones
-	//DHT dht(SEN_DATA, DHT22);
-	float Humedad = dht.readHumidity();
-  	float Temperatura = dht.readTemperature();
-	  sprintf(Datos,"T%5.1f H%5.1f",Temperatura,Humedad);
-  	//sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
-	// Check if any reads failed and exit early (to try again).
-  	if (isnan(Humedad) || isnan(Temperatura))
-	{
-    	BaseScpi.errorscpi(21);//Error lectura sensor humedad temperatura
-	}
-	Println(Datos);
-	TIMER_ADC.start();//Con el sensor DHT-22 se desactiva las interrupciones
-#endif
-//El DHT10 se utiliza sin librería. Para ver como se utiliza estudiar alguna librería
-#ifdef SENSOR_AHT10 //Este sensor tarda 520uS
-	if(aht10Conectado)
-	{
-		char Datos[128];
-		uint8_t rawData[6] = {0xFF, 0, 0, 0, 0, 0};// 0xFF es error
-		//Leee humedad y temperatura
-		I2C_SENSOR_HT.beginTransmission(AHT10_ADD);
-		uint8_t comando[3]={0xAC, 0x33, 0x00};
-		I2C_SENSOR_HT.write(comando,3); //Secuencia de comandos para leer la medida
-		if (I2C_SENSOR_HT.endTransmission(true) != 0)
-		{
-			BaseScpi.errorscpi(25);
-			LED3_0//digitalWrite(LED3,LOW);
-			TEST_SENSORHT_0 //digitalWrite(TEST_SENSORHT,LOW);
-			return;
-		}//Si falla la transmisión hay error
-		// lee 6 bytes del sensor
-		I2C_SENSOR_HT.requestFrom(AHT10_ADD, 6, true);//Solicita datos al dispositivo
-		if (I2C_SENSOR_HT.available() != 6){BaseScpi.errorscpi(25);}//Si no hay 6 datos sale con error
-		for (uint8_t i = 0; i < 6 ; i++){rawData[i] = I2C_SENSOR_HT.read();}//Lee en el array de datos
-		//Calcula la temperatura
-		uint32_t temp = ((uint32_t)(rawData[3] & 0x0F) << 16) | ((uint16_t) rawData[4] << 8) | rawData[5];
-		float Temperatura = (float)temp * 0.000191 - 50;
-		//Calcula la humedad
-		uint32_t humi = (((uint32_t) rawData[1] << 16) | ((uint16_t)rawData[2] << 8) | (rawData[3])) >> 4; //20-bit raw humidity data
-		float Humedad = (float)humi * 0.000095;
-		if (Humedad < 0.0)   Humedad= 0.0;
-		if (Humedad > 100.0) Humedad = 100.0;
-		//Envía los datos por el puerto
-		sprintf(Datos,"T%5.1f H%5.1f",Temperatura,Humedad);
-		//sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
-		Println(Datos);
-	}
-	else BaseScpi.errorscpi(24);//Error no hay sensor conectado
- #endif
- 
- #ifdef SENSOR_BME280
 	if(statusBME280)
 	{
 		char Datos[128];
@@ -1277,14 +1123,13 @@ void pc_sensor_temperatura_humedad(void)
 		Println(Datos);
 	}
 	else BaseScpi.errorscpi(24);//Error no hay sensor conectado
- #endif	
-
 	LED3_0//digitalWrite(LED3,LOW);
 	TEST_SENSORHT_0 //digitalWrite(TEST_SENSORHT,LOW);
 	return;
 }
 /*************************************************************************
  * Lee el sensor de temperatura y humedad BME280 y lo envia al PC.
+ * TO DO El BME280 también puede leer la presión.
    Comando MOT:BM?
 **************************************************************************/
 void pc_sensor_bme280(void)
@@ -1298,7 +1143,6 @@ void pc_sensor_bme280(void)
 		TEST_SENSORHT_0 //digitalWrite(TEST_SENSORHT,LOW);
 		return;
 	}
- #ifdef SENSOR_BME280
 	if(statusBME280)
 	{
 		char Datos[128];
@@ -1308,55 +1152,13 @@ void pc_sensor_bme280(void)
 		Println(Datos);
 	}
 	else BaseScpi.errorscpi(24);//Error no hay sensor conectado
- #endif	
 	LED3_0//digitalWrite(LED3,LOW);
 	TEST_SENSORHT_0 //digitalWrite(TEST_SENSORHT,LOW);
 	return;
 }
 /*************************************************************************
-		Lee el acelerómetro y lo envia al pc
-		El comando se procesa en 1,58ms
-		el MMA8452 tarda 488us
-		Comando MOT:AC?
- * **********************************************************************/
-void pc_acelerometro(void)
-{
-	float EjeX,EjeY; //
-	//float EjeZ;
-	char respuesta[64];
-	TEST_ACELEROMETRO_1
-	if(BaseScpi.FinComando[0]!='?')
-	{
-		BaseScpi.errorscpi(4);
-		TEST_ACELEROMETRO_0 
-		return;
-	}//Falta el parámetro
-	if(!AcelerometroConectado)
-	{
-		BaseScpi.errorscpi(23);
-		TEST_ACELEROMETRO_0 
-		return;
-	}//No hay acelerómetro conectado
-	if (Acelerometro.available()) 
-	{      // Wait for new data from accelerometer
-		EjeX=Acelerometro.getCalculatedX(); 
-		EjeY=Acelerometro.getCalculatedY();
-		//EjeZ=Acelerometro.getCalculatedZ();
-		//sprintf(respuesta,"%s %.2f %.2f %.2f",FACELEROMETRO,EjeX,EjeY,EjeZ);
-		sprintf(respuesta,"%s %.3f %.3f",FACELEROMETRO,EjeX,EjeY);
-		Println(respuesta);
-	}
-	else 
-	{
-		BaseScpi.errorscpi(23);
-		TEST_ACELEROMETRO_0 
-		return;
-	}//No hay acelerómetro conectado
-	TEST_ACELEROMETRO_0
-}
-/*************************************************************************
-		Desactiva el DC/DC de 48V
-		Comando MOT:AV 1
+		Activa o desactiva el DC/DC de 48V
+		Comando MOT:AV <1|0>
  * **********************************************************************/
 void pc_activa_48v()
 {
@@ -1425,190 +1227,11 @@ void pc_version(void)
 ************************************************************************/
 void pc_final_de_carrera(void){return;}
 /************************************************************************
-		FIN FUNCIONES SCPI QUE RESPONDEN A COMANDOS DEL PC
+		FUNCIONES PARA PONER O SACAR AL SISTEMA DEL MODO DEPURACIÓN
+		(modo utilizado solo en la fase de desarrollo)
 ************************************************************************/
-/************************************************************************
-		FUNCIONES QUE RESPONDEN A COMANDOS DEL BLUETOOTH
-************************************************************************/
-/************************************************************************
-		Función que envia los valores adquiridos por el ADC
-		Fuerza Nomal, Lateral, y Suma. Además del estado de marcha
-		paro del sistema y el contador de pasos.
-		Se ejecuta en 1.23ms
-		comando BTH:EST
-************************************************************************/
-void  bluetooth_estado(void)
-{
-	char respuesta[256];//Si pongo la cadena más corta no cabe todo
-	float fl,fn,sum;
-	unsigned int fuerzaNormal,fuerzaLateral,suma,emp;
-	//Cálculo de valores
-	fuerzaNormal=FuerzaNormal.media();
-	fn=mFn*fuerzaNormal+b_fn;//Calibrado
-	//fn=mFotoDiodo*fuerzaNormal+bFotoDiodo; //Sin calibrar
-	fuerzaLateral=FuerzaLateral.media();
-	fl=mFl*fuerzaLateral+b_fl;//Calibrado
-	//fl=mFotoDiodo*fuerzaLateral+bFotoDiodo;//Sin calibrar
-	suma=Suma.media();
-	sum=mSum*suma+b_sum;//Calibrado
-	//sum=mFotoDiodo*suma+bFotoDiodo;//Sin calibrar
-	//Fin cálculo de valores
-	if(EstadoMarchaParo) emp=10;
-	else emp=5;
-	sprintf	(respuesta,"%s %.2f %.2f %.2f %u %u",FBLUETOOTHESTADO,fn,fl,sum,emp,Pasos);
-	Println(respuesta);
-}
-/**************************************************************************
-  	Comando para seleccionar un motor activo, frecuencia,sentido
-	y pone el motor en marcha. 
-	La resolución con el mando es siempre 256.
-	Se ejecuta en 2.5ms si no cambia motor y 300ms si cambia motor
-	comando BTH:MARCHA <motor frecuencia sentido pasos>
-   	Parámetros esperados:
-	 motor (entero);
- 	0=NINGUNO, 1=Z1, 2=Z2, 3=Z3, 4=(Z1&Z2),5=(Z1&Z3),6=(Z2&Z3), 7=(Z1&Z2&Z3),
- 	8=X, 9=Y, 10=FotodiodoX, 11=LaserX, 12=LaserY, 13=FotodiodoY
-  	frecuencia (entero) 10KHz =<frecuncia=< 200 KHz
-  	Sentido (entero): 0=BAJAR/IZQUIERDA, 1=SUBIR/DERECHA.
-	Pasos entre 0 y PASOS_MAXIMOS	  
-**************************************************************************/
-void bluetooth_marcha_motor(void)
-{
-	unsigned int numParametros = 4;//Parametros esperados
-	unsigned int np; // numero de parametros leido por sscanf
-	//MotorActivo,Frecuencia,Sentido,Pasos
-	unsigned int parametro1,parametro2,parametro3,parametro4; // Son 4 parametros
-	char respuesta[16];
-	
-	// Si solo pregunta por los datos, se responde y sale
-	if(BaseScpi.FinComando[0]=='?')	
-	{
-		sprintf(respuesta,"%u %u %u %u",MotorActivo,Frecuencia,Sentido,Pasos);//Envía las variables globales del sistema
-		Println(respuesta);
-		 return;
-	}
-   		// Si el primer caracter de FinComado es 'espacio' lee parametros
-  		if(BaseScpi.FinComando[0]==' ')  
-	{   // Lee la cadena de parametros
-	 	np = sscanf(BaseScpi.FinComando,"%u %u %u %u",&parametro1,&parametro2,&parametro3,&parametro4);
-		if(np != numParametros){BaseScpi.errorscpi(6);return;}// Si no lee lo parametros esperados Error!
-	} 	
-	else {BaseScpi.errorscpi(5);return;} // Si el comando no empieza por 'espacio' Error!Parametro inexistente.
-	// Si el numero de parAmetros leidos es correcto Procesa los datos recibidos
-	// Primero tengo que comprobar que todo esta en rango. Si no lo esta, sale con error.
-	//1 Motor
-	if (parametro1 < MIN_MOTOR || parametro1 > MAX_MOTOR )
-	{BaseScpi.errorscpi(9);return;}// sale con error:motor incorrecto
-	//2 Frecuencia
-	//La máxima frecuencia con mando es 64KHz (64000Hz/256 = 250Hz) 256=resolucion_mando
-	if (!((parametro2 <= MAXIMA_FRECUENCIA_BTH && parametro2 >=  MINIMA_FRECUENCIA))) 
-		{BaseScpi.errorscpi(12);return;}
-	//4  Sentido
-	if (!(parametro3 == 0 || parametro3 == 1) ){BaseScpi.errorscpi(13);return;}// error:parametro sentido incorrecto
-	//Número de pasos a dar
-	if (!(parametro4 >= 0 && parametro4 <=PASOS_MAXIMOS) ){BaseScpi.errorscpi(15);return;}// error:número de pasos incorrectos
-	//
-	// Si todos los parametros estan en rango...
-	// Si frecuencia y resolución son compatibles actualiza todos los parámetros
-	if (cambia_frecuencia_resolucion(parametro2,RES_BTH))
-	{
-		cambia_motor(parametro1); // Cambia motor
-		cambia_sentido(parametro3); // Cambia el sentido
-		programa_pasos(parametro4);//Programa el número de pasos
-		marcha_paro_motor(MARCHA); // Al final pone el motor en marcha
-	}
-}
-/**************************************************************************
-  Función para el comando del bluetooth para  parar motor
-  Se ejecuta en 1ms
-  comando BTH:PARO
-**************************************************************************/
-void bluetooth_para_motor(void)
-{
-	marcha_paro_motor(PARO); 
-	Println(FSTOP);
-}
-/************************************************************************
-		FIN DE FUNCIONES QUE RESPONDEN A COMANDOS DEL BLUETOOTH
-************************************************************************/
-/************************************************************************
-		FUNCIONES DE TEST QUE RESPONDEN A COMANDOS DEL COMPUTADOR
-************************************************************************/
-//Salir o entrar en modo depuración
 void modo_depuracion_no(void){depuracion=false;}
 void modo_depuracion_si(void){depuracion=true;}
-// Relés
-void desactiva_rele_z1(void){digitalWrite(RELE_Z1,LOW);}
-void activa_rele_z1(void){digitalWrite(RELE_Z1,HIGH);}
-void desactiva_rele_z2(void){digitalWrite(RELE_Z2,LOW);}
-void activa_rele_z2(void){digitalWrite(RELE_Z2,HIGH);}
-void desactiva_rele_z3(void){digitalWrite(RELE_Z3,LOW);}
-void activa_rele_z3(void){digitalWrite(RELE_Z3,HIGH);}
-void desactiva_rele_y(void){digitalWrite(RELE_Y,LOW);}
-void activa_rele_y(void){digitalWrite(RELE_Y,HIGH);}
-void desactiva_rele_x(void){digitalWrite(RELE_X,LOW);}
-void activa_rele_x(void){digitalWrite(RELE_X,HIGH);}
-void desactiva_rele_hd(void){digitalWrite(RELE_HD,LOW);}
-void activa_rele_hd(void){digitalWrite(RELE_HD,HIGH);}	
-//Leds
-void desactiva_led_3(void){digitalWrite(LED3,LOW);}
-void activa_led_3(void){digitalWrite(LED3,HIGH);}
-void desactiva_led_2(void){digitalWrite(LED2,LOW);}
-void activa_led_2(void){digitalWrite(LED2,HIGH);}
-void desactiva_led_1(void){digitalWrite(LED1,LOW);}
-void activa_led_1(void){digitalWrite(LED1,HIGH);}
-void desactiva_led_0(void){digitalWrite(LED0,LOW);}
-void activa_led_0(void){digitalWrite(LED0,HIGH);}
-// Driver TCMC90
-void desactiva_res_1(void){digitalWrite(RES1,LOW);}
-void activa_res_1(void){digitalWrite(RES1,HIGH);}
-void desactiva_res_0(void){digitalWrite(RES0,LOW);}
-void activa_res_0(void){digitalWrite(RES0,HIGH);}
-void activa_mode_0(void){digitalWrite(MODE0,HIGH);}
-void desactiva_mode_0(void){digitalWrite(MODE0,LOW);}
-void activa_mode_1(void){digitalWrite(MODE1,HIGH);}
-void desactiva_mode_1(void){digitalWrite(MODE1,LOW);}
-void activa_dir(void){digitalWrite(SENTIDO,HIGH);}
-void desactiva_dir(void){digitalWrite(SENTIDO,LOW);}
-void activa_clk(void){digitalWrite(CLK,HIGH);}
-void desactiva_clk(void){digitalWrite(CLK,LOW);}
-// Motores de la cabeza
-void desactiva_motor_head_1(void){digitalWrite(MHD1,LOW);}
-void activa_motor_head_1(void){digitalWrite(MHD1,HIGH);}
-void desactiva_motor_head_0(void){digitalWrite(MHD0,LOW);}
-void activa_motor_head_0(void){digitalWrite(MHD0,HIGH);}
-//Acelerómetros
-void desactiva_i22(void){digitalWrite(I2_2,LOW);}	
-void activa_i22(void){digitalWrite(I2_2,HIGH);}
-void desactiva_i21(void){digitalWrite(I2_1,LOW);}
-void activa_i21(void){digitalWrite(I2_1,HIGH);}
-void desactiva_i12(void){digitalWrite(I1_2,LOW);}
-void activa_i12(void){digitalWrite(I1_2,HIGH);}
-void desactiva_i11(void){digitalWrite(I1_1,LOW);}
-void activa_i11(void){digitalWrite(I1_1,HIGH);}
-// Movimiento de motores
-void mueve_motor(void){TIMER_CLK.start(20 /* microsegundos */);} //Mueve motor	
-void para_motor(void){TIMER_CLK.stop();} //Para motor		
-void test_step(void)
-{
-	int per;
-	if(BaseScpi.actualizaVarEntera(&per,1000,1)==1)
-	 TIMER_CLK.start(per /* microsegundos */);
-}
-/*
-	Función para calibrar el ADC
-	Lee 2 parámetros decimales (m y b) y envía los 
-	valores de FN, FL, y SUM calculando la recta
-	con esos valores.
-*/
-void adc_calibracion(void)
-{
-	//TO DO 
-	//desarrollar esta función
-}
-/************************************************************************
-		FIN DE FUNCIONES QUE RESPONDEN A COMANDOS DEL COMPUTADOR
-************************************************************************/
 /************************************************************************
     Funciones scpi comunes a todos los sistemas
  *************************************************************************/
@@ -1639,3 +1262,6 @@ void opcSCPI(void){	BaseScpi.PuertoActual->println("1");}
  *************************************************************************/
 void clsSCPI(void){BaseScpi.errorscpi(-1);}
 /*************************************************************************/
+/************************************************************************
+		FIN DE FUNCIONES QUE RESPONDEN A COMANDOS DEL COMPUTADOR
+************************************************************************/

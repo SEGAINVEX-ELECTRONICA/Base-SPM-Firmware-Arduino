@@ -6,16 +6,16 @@
 	Aplicación para placa PCB_A con el Arduino DUE
 	Patricio Coronado. Mayo de 2019
 	26/05/2020
-	Editado el 17/07/2020
+	Editado el 26/09/2020
 */
 #include <Arduino.h>
-#include "Muestras.h" //Alase ra gestras del ADC
+#include "Muestras.h" //Calase para muestras del ADC
 /******************************************************************
 		Definición de pines
 *******************************************************************/
-#define LM500_SHDWN 58 //Activa la fuente de 48V
-#define P15V_ON 12 //Activa la fuente de 48V //Modificado
 //	Definición de pines
+#define LM500_SHDWN 58 //Activa el integrado DC/DC que genera 48V
+#define P15V_ON 12 //Alimenta el DC/DC Que genera los 48V
 //Driver de piezomotores TCMC90
 #define RES0  33 
 #define RES1  31 
@@ -32,7 +32,7 @@
 #define RELE_Z3 47
 #define RELE_X  45
 #define RELE_Y  43
-//LEDS AUXILIARES
+//LEDs
 #define LED0 41 //Led frontal PC9. Arduino pin 41 es port C pin 9.
 #define LED0_1 PIOC->PIO_SODR=(1<<9);   // set pin
 #define LED0_0 PIOC->PIO_CODR=(1<<9);  // clear pin
@@ -51,30 +51,13 @@
 #define LED5  69 //Led 5 Arduino pin 69 es port A pin 0.
 #define LED5_1 PIOA->PIO_SODR=(1<<0);   // set pin
 #define LED5_0 PIOA->PIO_CODR=(1<<0);  // clear pin
-// Acelerómetros
-#define I2_1 14	
-#define I1_1 15
-#define I2_2 16 
-#define I1_2 17
-// Sensor humedad temperatura
-#define SEN_DATA  63 //Datos
-#define SEN_CLK  64 //CLK
-//Infrarojo
-#define IR_DATA 63
-//Tensión de 48V potencia del driver
-#define SALIDA_48V 61
 //Motores de la cabeza
 #define MHD1 3
 #define MHD0 2
 // Lineas de control desde Dulcinea 
-#define DSP_CLK A8 //cambiado, antes era 5.16/09/2020
-#define DSP_48V A9// cambiado, antes era 4.16/09/2020
-// Timer para clk del driver de motores piezoleg 
-#define TIMER_CLK Timer5
-#define TIMER_ADC Timer4
-#define TIMER_FOTO_ACEL Timer3 
-
-// Entradas analógicas
+#define DSP_CLK A8 //Pin 62 CLK desde Dulcinea cambiado, antes era el pin 5 16/09/2020
+#define DSP_48V A9// Pin 63 (no se utiliza, era para apagar los 48V desde Dulcinea pin) cambiado, antes era el pin 4 16/09/2020
+// Entradas analógicas desde el fotodiodo
 #define F_NORMAL A5
 #define F_LATERAL A7
 #define SUM A6
@@ -82,7 +65,6 @@
 #define TEST_ADC 22// Arduino pin 22 es port B pin 26.
 #define TEST_ADC_1 PIOB->PIO_SODR=(1<<26);   // set pin
 #define TEST_ADC_0 PIOB->PIO_CODR=(1<<26);  // clear pin
-#define TEST_CLK 26
 #define TEST_SENSORHT 30// Arduino pin 30 es port D pin 9.
 #define TEST_SENSORHT_1 PIOD->PIO_SODR=(1<<9);   // set pin
 #define TEST_SENSORHT_0 PIOD->PIO_CODR=(1<<9);  // clear pin
@@ -92,7 +74,15 @@
 #define TEST_FOTODIODO 38 // Arduino pin 38 es port C pin 6.
 #define TEST_FOTODIODO_1 PIOC->PIO_SODR=(1<<6);   // set pin
 #define TEST_FOTODIODO_0 PIOC->PIO_CODR=(1<<6);  // clear pin
-#define TEST_1 42
+/******************************************************************
+		Fin definición de pines
+*******************************************************************/
+/*****************************************************************
+        Timers 
+*******************************************************************/
+#define TIMER_CLK Timer5 //para clk del driver de motores piezoleg
+#define TIMER_ADC Timer4 //Para muestrerar las señales del fotodiodo
+#define TIMER_FOTO_ACEL Timer3 //Para temporizar envios al PC de señales de accel. y fotodiodo
 /******************************************************************
 				MODOS DE ONDA
 	Solo se va a utilizar el modo de onda OMEGA64 y sus
@@ -108,8 +98,7 @@
 #define SINE1S85 2
 #define RHOMB    1  
 #define RHOMBF	 0
-#define RES_BTH 256
-#define RES_INICIAL 2028
+#define RES_INICIAL 2028 //Resolución por defecto
 /******************************************************************
 					MOTORES
 *******************************************************************/
@@ -145,12 +134,6 @@
 #define MINIMA_FRECUENCIA 0   // Frecuencia del step mÍnima en KHz
 //La frecuencia la puedo subier a 150KHz pero hay que modificar el ajuste resolución-frecuencia
 #define MAXIMA_FRECUENCIA 100 // Frecuencia del step máxima en KHz
-#define MAXIMA_FRECUENCIA_BTH 64 // Frecuencia máxima con mando
-#define FRECUENCIA_1 1  //KHz Escala de frecuencias para seleccionar según
-#define FRECUENCIA_2 5	//KHz la posiciOn del mando 1,2,3,4,5 
-#define FRECUENCIA_3 15 //KHz
-#define FRECUENCIA_4 30 //KHz
-#define FRECUENCIA_5 63 //KHz
 #define PASOS_MAXIMOS 600000 //Máximo número de pasos que se pueden programar
 //#define PASOS_MAXIMOS 500000 //Máximo número de pasos que se pueden programar
 #define CONTADOR_MAXIMO 800000
@@ -159,14 +142,6 @@
 ************************************************************************/
 #define MAX_FREC_I2C 400000 //Frecuencia I2C máxima
 #define NORMAL_FREC_I2C 100000 //Frecuencia I2C standar
-/************************************************************************
-				VARIOS
-************************************************************************/
-#define ENCENDIDO 1
-#define APAGADO 0
-//#define ACCEL_HEXADECIMAL 1 //Comentar para enviar los datos como float si no complemento a 2
-#define SI 1
-#define NO 0
 /********************************************************************
 				Prototipos de funciones
 *********************************************************************/
@@ -174,7 +149,6 @@
 				Funciones que responden al PC
 **********************************************************************/
 void pc_marcha_motor_pasos(void);
-void pc_fotodiodo(void);
 void pc_sensor_temperatura_humedad(void);
 void pc_sentido(void);
 void pc_frecuencia(void);
@@ -187,14 +161,13 @@ void pc_contador(void);
 void pc_anda_numero_de_pasos(void);
 void pc_version(void);// Envía al PC la versión del software
 void pc_reset(void);//Pone la base en el estado inicial
-void pc_variables(void);//Devuelve al PC las variables de estado
-void pc_acelerometro(void);
+void pc_variables(void);//Devuelve al PC las variables del sistema
 void pc_inicia_fotodiodo(void);
 void pc_fin_fotodiodo(void);
 void pc_inicia_acelerometro(void);
 void pc_fin_acelerometro(void);
 void pc_activa_48v(); //Activa/desactiva ed DC/DC 48V
-void pc_sensor_bme280(void);
+void pc_sensor_bme280(void);//TO DO También puede leer la presión
 //Funciones scpi comunes a todos los sistemas
 void errorSCPI(void);
 void opcSCPI(void);
@@ -204,13 +177,7 @@ void clsSCPI(void);
 void pc_final_de_carrera(void);
 
 /**********************************************************************
-		Funciones que responden al mando bluethoot
-**********************************************************************/
-void bluetooth_marcha_motor(void);
-void bluetooth_para_motor(void);
-void bluetooth_estado(void);
-/**********************************************************************
-	Funciones que testean y cambian las variables del sistema
+	Funciones que actuan sobre las variables del sistema
 **********************************************************************/
 void timer_clk(void); //rutina de atención a la interrupción del timer del clk
 void clk_externo(void);//rutina de atención a la interrupción del pin DSP_CLK
@@ -221,179 +188,60 @@ int cambia_frecuencia_resolucion(unsigned int Frec,unsigned int Res);
 int cambia_motor(unsigned int);
 int cambia_sentido(unsigned int);
 int marcha_paro_motor(unsigned int);
-void parar_clk_step(void);//Función auxiliar de marcha_paro_motor()
+void parar_clk_step(void);//Función inline, auxiliar de marcha_paro_motor()
 void activa_48V(void);//Función fs1: Activa la fuente de 48V
 void desactiva_48V(void);// Desactiva la fuente de 48V
 void programa_pasos(int);//Programa el número de pasos
 bool busca_acelerometro(void);//Busca el acelerómetro
 /**********************************************************************
 					Funciones para test
+	Si el sistema está en modo depuración la variable "depuracion"
+	es true. En fase de depuración Se pueden enviar cadenas al PC
+	en puntos críticos del programa con información sensible que 
+	ayude a detectar problemas. 
 **********************************************************************/
-// Relés
 void modo_depuracion_no(void);
 void modo_depuracion_si(void);
-void desactiva_rele_z1(void);
-void activa_rele_z1(void);
-void desactiva_rele_z2(void);
-void activa_rele_z2(void);
-void desactiva_rele_z3(void);
-void activa_rele_z3(void);
-void desactiva_rele_y(void);
-void activa_rele_y(void);
-void desactiva_rele_x(void);
-void activa_rele_x(void);
-void desactiva_rele_hd(void);
-void activa_rele_hd(void);
-//Leds
-void desactiva_led_3(void);
-void activa_led_3(void);
-void desactiva_led_2(void);
-void activa_led_2(void);
-void desactiva_led_1(void);
-void activa_led_1(void);
-void desactiva_led_0(void);
-void activa_led_0(void);
-// Driver TCMC90
-void desactiva_res_1(void);
-void activa_res_1(void);
-void desactiva_res_0(void);
-void activa_res_0(void);
-void activa_mode_0(void);
-void desactiva_mode_0(void);
-void activa_mode_1(void);
-void desactiva_mode_1(void);
-void activa_dir(void);
-void desactiva_dir(void);
-void activa_clk(void);
-void desactiva_clk(void);
-// Motores de la cabeza
-void desactiva_motor_head_1(void);
-void activa_motor_head_1(void);
-void desactiva_motor_head_0(void);
-void activa_motor_head_0(void);
-//Acelerómetros
-void desactiva_i22(void);
-void activa_i22(void);
-void desactiva_i21(void);
-void activa_i21(void);
-void desactiva_i12(void);
-void activa_i12(void);
-void desactiva_i11(void);
-void activa_i11(void);
-// Movimiento de motores (activa el clk de steps 200us)
-void mueve_motor(void);
-void para_motor(void);
-void test_step(void);
-void adc_calibracion(void);
 /************************************************************************
 		          // Menú de comandos SCPI
 ************************************************************************/
-tipoNivel BLUETOOTH[] = //BTH  Array de estructuras tipo Nivel
-{
-	SCPI_COMANDO(MARCHA,MARCHA, bluetooth_marcha_motor)
-	SCPI_COMANDO(PARO,PARO, bluetooth_para_motor)
-	SCPI_COMANDO(ESTADO,EST, bluetooth_estado)
-};
 tipoNivel MOTORES[] = //Comandos del PC que hacen funcionar el sistema
 {
-	SCPI_COMANDO(FOTODIODO,FOT,pc_fotodiodo)//La base envía las señales del fotodiodo
-	SCPI_COMANDO(TH,TH,pc_sensor_temperatura_humedad)//La base envía la temperatura y humedad
-	SCPI_COMANDO(MARCHAMOTORPASOS,MMP,pc_marcha_motor_pasos)//Programa un motor con resolución, frecuencia, sentido y pasos y lo pone en marcha
-	SCPI_COMANDO(MARCHAMOTOR,MM,pc_marcha_motor)//Programa un motor con resolución, frecuencia, sentido y lo pone en marcha
-	SCPI_COMANDO(MARCHAPARO,MP, pc_marcha_paro)//Pone en marcha el motor seleccionado
-	SCPI_COMANDO(ACTIVA48V,AV,pc_activa_48v)//Activa 48V
-	SCPI_COMANDO(FRECUENCIA,FR,pc_frecuencia)//Actualiza el valor de frecuencia de paso (micropaso)
-	SCPI_COMANDO(ANPASOS,AN,pc_anda_numero_de_pasos)// Programa un número de pasos a dar "Pasos" y se decremente cada paso 
+	SCPI_COMANDO(TH,TH,pc_sensor_temperatura_humedad)//La base envía la temperatura y humedad *
+	SCPI_COMANDO(MARCHAMOTORPASOS,MMP,pc_marcha_motor_pasos)//Programa un motor con resolución, frecuencia, sentido y pasos y lo pone en marcha *
+	SCPI_COMANDO(MARCHAMOTOR,MM,pc_marcha_motor)//Programa un motor con resolución, frecuencia, sentido y lo pone en marcha *
+	SCPI_COMANDO(MARCHAPARO,MP, pc_marcha_paro)//Pone en marcha el motor seleccionado *
+	SCPI_COMANDO(ACTIVA48V,AV,pc_activa_48v)//Activa 48V *
+	SCPI_COMANDO(FRECUENCIA,FR,pc_frecuencia)//Actualiza el valor de frecuencia de paso (micropaso) *
+	SCPI_COMANDO(ANPASOS,AN,pc_anda_numero_de_pasos)// Programa un número de pasos a dar "Pasos" y se decremente cada paso * 
 	SCPI_COMANDO(MOTORACTIVO,MA,pc_motor_activo)//Cambia el motor seleccionado
 	SCPI_COMANDO(RESOLUCION,RE,pc_resolucion)//Cambia la resolución
-	SCPI_COMANDO(SENT,SE,pc_sentido)//Para cambiar el sentido
+	SCPI_COMANDO(SENT,SE,pc_sentido)//Para cambiar el sentido *
 	SCPI_COMANDO(BME280,BM,pc_sensor_bme280)//Lee el sensor de humedad y temperatura BME280 
-	SCPI_COMANDO(CONTADOR,CO,pc_contador)//Contador que se inicializa trás un comando de "marcha"
-	SCPI_COMANDO(ACELEROM,AC,pc_acelerometro)//Lee el acelerómetro
-	SCPI_COMANDO(INIFOT,IFO,pc_inicia_fotodiodo)//El fotodiodo envia datos cada 200ms
- 	SCPI_COMANDO(FINFOT,FIF,pc_fin_fotodiodo)//El fotodiodo deja de envia datos cada 200ms
-	SCPI_COMANDO(INIACEL,IAC,pc_inicia_acelerometro)//El acelerometro envia datos cada 200ms
- 	SCPI_COMANDO(FINACEL,FNA,pc_fin_acelerometro)//El acelerometro deja de envia datos cada 200ms
-	SCPI_COMANDO(RESET,RS,pc_reset)//Pone la base en su estado inicial
-	SCPI_COMANDO(VARIABLES,VAR,pc_variables)//Pone las variables en un estado determinado
+	SCPI_COMANDO(CONTADOR,CO,pc_contador)//Contador que se inicializa trás un comando de "marcha" *
+	SCPI_COMANDO(INIFOT,IFO,pc_inicia_fotodiodo)//El fotodiodo envia datos cada 200ms *
+ 	SCPI_COMANDO(FINFOT,FIF,pc_fin_fotodiodo)//El fotodiodo deja de envia datos cada 200ms *
+	SCPI_COMANDO(INIACEL,IAC,pc_inicia_acelerometro)//El acelerometro envia datos cada 200ms *
+ 	SCPI_COMANDO(FINACEL,FNA,pc_fin_acelerometro)//El acelerometro deja de envia datos cada 200ms *
+	SCPI_COMANDO(RESET,RS,pc_reset)//Pone la base en su estado inicial *
+	SCPI_COMANDO(VARIABLES,VAR,pc_variables)//Pone las variables en un estado determinado *
 	SCPI_COMANDO(VERSION,VER,pc_version)// Envía al PC la versión del software
 	SCPI_COMANDO(ONDA,ON,pc_onda)//No la utiliza su software. Se programa para uso futuro
 	SCPI_COMANDO(HABILITAFC,HF,pc_final_de_carrera)// Por compatibilidad. No hay finales de carrera
 	SCPI_COMANDO(FLAGERRORFC,FE,pc_final_de_carrera) //Por compatibilidad. No hay finales de carrera
-};
-tipoNivel TEST[] = // Comandos de test
-{
-	//Fuente de 48V 
-	SCPI_COMANDO(CAL_ADC,CAL,adc_calibracion)
-	SCPI_COMANDO(TESTSTEP,TS,test_step)
+    // Pone el sistema en modo depuración. Solo para la fase de desarrollo 
 	SCPI_COMANDO(MODODEPURACIONSI,MDS,modo_depuracion_si)
 	SCPI_COMANDO(MODODEPURACIONNO,MDN,modo_depuracion_no)
-	SCPI_COMANDO(ACTIVA_48V,A48,activa_48V)
-	SCPI_COMANDO(DESACTIVA_48,D48,desactiva_48V)
-	//Mueve o para motores
-	SCPI_COMANDO(MUEVE_MOTOR,MM,mueve_motor)
-	SCPI_COMANDO(PARA_MOTOR,PM,para_motor)
-	// Relés
-	SCPI_COMANDO(ACTIVA_X,AX,activa_rele_x) 
-	SCPI_COMANDO(DESACTIVA_X,DX,desactiva_rele_x) 
-	SCPI_COMANDO(ACTIVA_Y,AY,activa_rele_y)
-	SCPI_COMANDO(DESACTIVA_Y,DY,desactiva_rele_y)
-	SCPI_COMANDO(ACTIVA_Z1,AZ1,activa_rele_z1)
-	SCPI_COMANDO(DESACTIVA_Z1,DZ1,desactiva_rele_z1)
-	SCPI_COMANDO(ACTIVA_Z2,AZ2,activa_rele_z2)
-	SCPI_COMANDO(DESACTIVA_Z2,DZ2,desactiva_rele_z2)
-	SCPI_COMANDO(ACTIVA_Z3,AZ3,activa_rele_z3)
-	SCPI_COMANDO(DESACTIVA_Z3,DZ3,desactiva_rele_z3)
-	SCPI_COMANDO(ACTIVA_HD,AH,activa_rele_hd)
-	SCPI_COMANDO(DESACTIVA_HD,DH,desactiva_rele_hd)
-	//Leds
-	SCPI_COMANDO(ACTIVA_LED0,AL0,activa_led_0)
-	SCPI_COMANDO(DESACTIVA_LED0,DL0,desactiva_led_0)
-	SCPI_COMANDO(ACTIVA_LED1,AL1,activa_led_1)
-	SCPI_COMANDO(DESACTIVA_LED1,DL1,desactiva_led_1)
-	SCPI_COMANDO(ACTIVA_LED2,AL2,activa_led_2)
-	SCPI_COMANDO(DESACTIVA_LED2,DL2,desactiva_led_2)
-	SCPI_COMANDO(ACTIVA_LED3,AL3,activa_led_3)
-	SCPI_COMANDO(DESACTIVA_LED3,DL3,desactiva_led_3)
-	// Driver TCMC90
-	SCPI_COMANDO(ACTIVA_RES0,AR0,activa_res_0)			
-	SCPI_COMANDO(DESACTIVA_RES0,DR0,desactiva_res_0)
-	SCPI_COMANDO(ACTIVA_RES1,AR1,activa_res_1)
-	SCPI_COMANDO(DESACTIVA_RES1,DR1,desactiva_res_1)
-	SCPI_COMANDO(ACTIVA_MODE0,AM0,activa_mode_0)
-	SCPI_COMANDO(DESACTIVA_MODE0,DM0,desactiva_mode_0)
-	SCPI_COMANDO(ACTIVA_MODE1,AM1,activa_mode_1)
-	SCPI_COMANDO(DESACTIVA_MODE1,DM1,desactiva_mode_1)
-	SCPI_COMANDO(ACTIVA_DIR,AD,activa_dir)
-	SCPI_COMANDO(DESACTIVA_DIR,DD,desactiva_dir)
-	SCPI_COMANDO(ACTIVA_CLK,ACK,activa_clk)
-	SCPI_COMANDO(DESACTIVA_CLK,DCK,desactiva_clk)
-	// Motores de la cabeza
-	SCPI_COMANDO(ACTIVA_MH0,AMH0,activa_motor_head_0)
-	SCPI_COMANDO(DESACTIVA_MH0,DMH0,desactiva_motor_head_0)
-	SCPI_COMANDO(ACTIVA_MH1,AMH1,activa_motor_head_1)
-	SCPI_COMANDO(DESACTIVA_MH1,DMH1,desactiva_motor_head_1)
-	//Acelerómetros
-	SCPI_COMANDO(ACTIVA_I1_1,AI11,activa_i11)
-	SCPI_COMANDO(DESACTIVA_I1_1,DI11,desactiva_i11)
-	SCPI_COMANDO(ACTIVA_I1_2,AI12,activa_i12)
-	SCPI_COMANDO(DESACTIVA_I1_2,DI12,desactiva_i12)
-	SCPI_COMANDO(ACTIVA_I2_1,AI21,activa_i21)
-	SCPI_COMANDO(DESACTIVA_I2_1,DI21,desactiva_i21)
-	SCPI_COMANDO(ACTIVA_I2_2,AI22,activa_i22)
-	SCPI_COMANDO(DESACTIVA_I2_2,DI22,desactiva_i22)
 };
+
 MENU_SCPI  //menú de  comandos
 {
 	SCPI_SUBMENU(MOTORES,MOT)	//COMANDOS DEL PC
-	SCPI_SUBMENU(BLUETOOTH,BTH)	//COMANDOS DEL BLUETOOTH
 	//Comandos que ejecutan funciones definidas en la librería Segainvex_SCPI_Serial
 	SCPI_COMANDO(ERROR,ERR,errorSCPI)// Envía el ultimo error
   	SCPI_COMANDO(*IDN,*IDN,idnSCPI)// Identifica el instrumento
 	SCPI_COMANDO(*OPC,*OPC,opcSCPI)// Devuelve un 1 al PC
 	SCPI_COMANDO(*CLS,*CLS,clsSCPI)// Borra la pila de errores
-	//Comandos para test
-	SCPI_SUBMENU(TEST,TEST)	//COMANDOS DEL PC PARA TEST	
 };
 tipoNivel Raiz[]= SCPI_RAIZ //// Declaración OBLIGATORIA del nivel Raiz. Siempre igual
 //Lista de errores:
@@ -426,10 +274,15 @@ String ErroresBaseSPM[]=
 /************************************************************************
     Objetos, constantes y variables de estado del sistema	(globales)	
 ************************************************************************/
-//Fotodiodo. Pendiente y término independiente para ajustar la respuesta del ADC 
+/***********************************************************************
+		Fotodiodo, acelerómetro y sensor de  temperatura-humedad
+************************************************************************/
+// Pendiente  y término independiente para ajustar la respuesta del ADC 
 // float Vfotod=mFotoDiodo*ADC+bFotodiodo
 // Ajuste para una Vref de 3.3V (por defecto) Si se cambia a externa 3V hay que reajustar 
-// los valores de mFotoDiodo y bFotodiodo (ver cuaderno Patricio 9, pg 19 y 33)
+// los valores de mFotoDiodo y bFotodiodo (ver cuaderno de taller "Patricio 9", pg 19 y 33)
+
+//En general se pueden utilizar los valres calculados sin cometer un error mayor del 2%
 float mFotoDiodo =-0.007120; //Valor calculado
 float bFotoDiodo = 13.253; //Valor calculado
 
@@ -457,7 +310,6 @@ float b_fl = 13.253;
 float b_sum = 13.253;
 
 //Acelerómetro MMA8452
-
 MMA8452Q Acelerometro;
 bool AcelerometroConectado=false;
 //Retardos para el apagado y encendido del DC/DC de 48V
@@ -471,43 +323,22 @@ bool AcelerometroConectado=false;
 bool FotoAcel;//Para indicar si se envian datos del fotodiodo o del acelerómetro
 #define ACELEROMETRO 1
 #define FOTODIODO 0
+//Opciones para tiempo entre envios de señales de acelerómetro o fotodiodo
 #define T300ms 300000 
 #define T250ms 250000 
-#define T200ms 200000 
+#define T200ms 200000 //Por defecto
 #define T100ms 100000 
-#define T150ms 150000
+#define T150ms 150000 
 #define T50ms   50000
-int contadorEnvios=0;
+int contadorEnvios=0; //Cantidad de cadenas con las señales del fotodiodo o acelerómetro a enviar al PC
 #define ENVIOS_MAXIMOS 10000 //Contador de envios de fotodiodo o acelerómetro 60' si se envía cada 200ms
-//Sensor humedad temperatura descomentar el que se use 
-//#define SENSOR_SHT11
-//#define SENSOR_DHT22
-#define SENSOR_BME280
-//#define SENSOR_AHT10
-//
-//Instanciación el objeto sensor de temperatura humedad
-#ifdef SENSOR_AHT10
-	#define AHT10_ADD 0X38
-	bool aht10Conectado = false;
-	bool busca_aht10(void); //Busca el sensor de humedad temperatura AHT10
-#endif
-#ifdef SENSOR_SHT11
-	SHT1x SHT11(SEN_DATA, SEN_CLK);
-#endif
-#ifdef SENSOR_DHT22
-	DHT dht(SEN_DATA, DHT22);
-#endif
-
-#ifdef SENSOR_BME280
-	Adafruit_BME280 bme; // Instancia el sensor para I2C
-	unsigned statusBME280;
-#endif
-
-//Objeto SCPI
+//Sensor de temperatura humedad. Instanciación del objeto 
+Adafruit_BME280 bme; // Instancia el sensor para I2C
+unsigned statusBME280;
 String NombreDelSistema = "Base SPM"; //Puesto para depuración. Se puede quitar.
-SegaSCPI BaseScpi(Raiz,"Base SPM",ErroresBaseSPM);
+SegaSCPI BaseScpi(Raiz,"Base SPM",ErroresBaseSPM); //Objeto SCPI. Le indico el menú raiz, el nombre del sistema y el array de errores
 bool StopPasos=false; //Flag para informar de que se han dado los pasos pedidos
-char Version[]="Base SPM V1.3.1";//Las distintas "Bases SPM" pueden tener versión
+char Version[]="Base SPM V1.3.2";//Las distintas "Bases SPM" pueden tener versión
 //Variables para depuración. Activación con "depuracion" y puerto para depuración
 bool depuracion=false; //1 para hacer depuración del software. 0 servicio 
 //normal. El modo depuración se usa en la fase de desarrollo del software
@@ -544,7 +375,8 @@ int Periodo[]={1000, 1000, 500, 333, 250, 200, 167, 143, 125, 111, 100, 91, 83,
 /************************************************************************
 	              macros
 ************************************************************************/
-#define DESACTIVA_MOTORES \
+//Macro para desactivar todos los motores
+#define DESACTIVA_MOTORES\
 	{digitalWrite(RELE_Z1,LOW);\
 	digitalWrite(RELE_Z2,LOW);\
 	digitalWrite(RELE_Z3,LOW);\
@@ -552,15 +384,13 @@ int Periodo[]={1000, 1000, 500, 333, 250, 200, 167, 143, 125, 111, 100, 91, 83,
 	digitalWrite(RELE_Y,LOW);\
 	digitalWrite(RELE_HD,LOW);}
 //Macro para la lectura del pin DSP_48V 
-//#define _DSP_48V digitalRead(DSP_48V) //Lectura del pin del DSP
-#define _DSP_48V 1 //Anulo la lectura y fuerzo el valor a 1
+// TODO quitar toda alusión al pin DSP_48V
+#define _DSP_48V 1 //Anulo la lectura de DSP_48 y fuerzo el valor a 1
 // Serial
-//Para no tener que teclear todo al aludir al puerto serie 
- //BaseScpi.PuertoActual->println(); ahora sería puerto->println();;
+//Para no tener que teclear todo al aludir al puerto serie actual 
 #define Println BaseScpi.PuertoActual->println 
-//#define Printf BaseScpi.PuertoActual->printf //No soporta Serial.printf
 #define Print BaseScpi.PuertoActual->print
-#define debug Serial.print //Puerto para depuracion
+#define debug Serial.print //Puerto mini USB
 /************************************************************************
  * Firmas de las  cadenas enviadas por serial
 ************************************************************************/
@@ -575,12 +405,14 @@ int Periodo[]={1000, 1000, 500, 333, 250, 200, 167, 143, 125, 111, 100, 91, 83,
 #define FMOTORACTIVO       "MV" //pc_motor_activo(void);
 #define FRESOLUCION        "RS" //pc_resolucion(void);
 #define FONDA              "NN" //pc_onda(void);
-#define FFOTODIODO         "FT" //pc_fotodiodo(void); 
+#define FFOTODIODO         "FT" //pc_inicia_fotodiodo(void); 
 #define FTEMPERATURA       "T "  //pc_sensor_temperatura_humedad(void); 
-#define FACELEROMETRO      "LC" //pc_acelerometro(void);
+#define FACELEROMETRO      "LC" //pc_inicia_acelerometro(void);
 #define FVERSION           "KK" //pc_version(void); 
 #define FIDN               "DW" //void idnSCPI(void); 
 #define FSTOP              "ZP" //Mensaje de parada. Se envía para informar de parada de motor
-#define FBLUETOOTHESTADO   "YY" //void  bluetooth_estado(void)
 #define FESTADO48V         "JJ" //La cadena es 1 o 0 estado del DC/DC activo o no
 #define BME280             "UA" //Respuesta del sensor MBE280
+/*****************************************************************
+ *                          fin
+ *****************************************************************/
