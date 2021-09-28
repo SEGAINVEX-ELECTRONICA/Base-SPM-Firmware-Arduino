@@ -9,10 +9,10 @@
 
 ## Por [Patricio Coronado, ](https://patriciocoronadocollado.000webhostapp.com/) en [SEGAINVEX-Electrónica](https://www.uam.es/uam/segainvex) para el [Departamento de Física de la Materia Condensada de la UAM](https://www.fmc.uam.es/research/nano-spm-lab/)
 
-# Cambios de esta versión respecto a la V1_2_1 y anteriores:
-## Cambia el sensor de humedad temperatura por el BME280 controlado por I2C
-## Cambian los pines para comunicar con el sensor y activar el DC/DC de 48V
-## Cambiado el pin de la señal DSP_CLK y DSP_48V
+## Cambios de esta versión respecto a la V1_2_1 y anteriores:
+### Cambia el sensor de humedad temperatura por el BME280 controlado por I2C
+### Cambian los pines para comunicar con el sensor y activar el DC/DC de 48V
+### Cambiado el pin de la señal DSP_CLK y DSP_48V
 
 ## 
 # DEPENDENCIAS
