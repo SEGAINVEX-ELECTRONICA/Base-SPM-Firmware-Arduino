@@ -194,6 +194,7 @@ void pc_fin_fotodiodo(void);
 void pc_inicia_acelerometro(void);
 void pc_fin_acelerometro(void);
 void pc_activa_48v(); //Activa/desactiva ed DC/DC 48V
+void pc_sensor_bme280(void);
 //Funciones scpi comunes a todos los sistemas
 void errorSCPI(void);
 void opcSCPI(void);
@@ -283,6 +284,7 @@ void activa_i11(void);
 void mueve_motor(void);
 void para_motor(void);
 void test_step(void);
+void adc_calibracion(void);
 /************************************************************************
 		          // Menú de comandos SCPI
 ************************************************************************/
@@ -305,6 +307,7 @@ tipoNivel MOTORES[] = //Comandos del PC que hacen funcionar el sistema
 	SCPI_COMANDO(MOTORACTIVO,MA,pc_motor_activo)//Cambia el motor seleccionado
 	SCPI_COMANDO(RESOLUCION,RE,pc_resolucion)//Cambia la resolución
 	SCPI_COMANDO(SENT,SE,pc_sentido)//Para cambiar el sentido
+	SCPI_COMANDO(BME280,BM,pc_sensor_bme280)//Lee el sensor de humedad y temperatura BME280 
 	SCPI_COMANDO(CONTADOR,CO,pc_contador)//Contador que se inicializa trás un comando de "marcha"
 	SCPI_COMANDO(ACELEROM,AC,pc_acelerometro)//Lee el acelerómetro
 	SCPI_COMANDO(INIFOT,IFO,pc_inicia_fotodiodo)//El fotodiodo envia datos cada 200ms
@@ -321,6 +324,7 @@ tipoNivel MOTORES[] = //Comandos del PC que hacen funcionar el sistema
 tipoNivel TEST[] = // Comandos de test
 {
 	//Fuente de 48V 
+	SCPI_COMANDO(CAL_ADC,CAL,adc_calibracion)
 	SCPI_COMANDO(TESTSTEP,TS,test_step)
 	SCPI_COMANDO(MODODEPURACIONSI,MDS,modo_depuracion_si)
 	SCPI_COMANDO(MODODEPURACIONNO,MDN,modo_depuracion_no)
@@ -426,17 +430,34 @@ String ErroresBaseSPM[]=
 // float Vfotod=mFotoDiodo*ADC+bFotodiodo
 // Ajuste para una Vref de 3.3V (por defecto) Si se cambia a externa 3V hay que reajustar 
 // los valores de mFotoDiodo y bFotodiodo (ver cuaderno Patricio 9, pg 19 y 33)
-float mFotoDiodo =-0.007122; //Valor calculado
-float bFotoDiodo = 13.26; //Valor calculado
-//Parámetro b de calibración del fotodiodo. Sustituyen a mFotoDiodo
-float mFn =-0.00705; //Valor calculado
-float mFl =-0.00702; //Valor calculado
-float mSum =-0.0071; //Valor calculado
-//Parámetro b de calibración del fotodiodo. Sustituyen a bFotoDiodo
+float mFotoDiodo =-0.007120; //Valor calculado
+float bFotoDiodo = 13.253; //Valor calculado
+
+/*Base 20200148
+//Parámetro b de calibración del fotodiodo. Valor empírico que sustituyen al valor calculado mFotoDiodo
+float mFn =-0.00705; //Valor empírico
+float mFl =-0.00702; //Valor empírico
+float mSum =-0.007; //Valor empírico
+//Parámetro b de calibración del fotodiodo.Valor empírico que sustituyen al valor calculado bFotoDiodo
 float b_fn = 12.908;
 float b_fl = 12.797;
 float b_sum = 12.9646;
+*/
+/*Base 20191398. He utilizado los valores calculados y no hay error mayor del 2%*/
+/*En el resto de las bases he utilizado el valor calculado y los errores no pasan del 2%*/
+
+//Parámetro b de calibración del fotodiodo. Poner aquí el valor empírico (si se llega a calcular) que sustituyen al valor calculado mFotoDiodo
+float mFn =-0.00712; //Valor empírico
+float mFl =-0.00712; //Valor empírico
+float mSum =-0.00712; //Valor empírico
+
+//Parámetro b de calibración del fotodiodo. Poner aquí el valor empírico (si se llega a calcular) que sustituyen al valor calculado bFotoDiodo
+float b_fn = 13.253;
+float b_fl = 13.253;
+float b_sum = 13.253;
+
 //Acelerómetro MMA8452
+
 MMA8452Q Acelerometro;
 bool AcelerometroConectado=false;
 //Retardos para el apagado y encendido del DC/DC de 48V
@@ -482,14 +503,11 @@ int contadorEnvios=0;
 	unsigned statusBME280;
 #endif
 
-
-
-
 //Objeto SCPI
 String NombreDelSistema = "Base SPM"; //Puesto para depuración. Se puede quitar.
 SegaSCPI BaseScpi(Raiz,"Base SPM",ErroresBaseSPM);
 bool StopPasos=false; //Flag para informar de que se han dado los pasos pedidos
-char Version[]="Base SPM V1.3";//Las distintas "Bases SPM" pueden tener versión
+char Version[]="Base SPM V1.3.1";//Las distintas "Bases SPM" pueden tener versión
 //Variables para depuración. Activación con "depuracion" y puerto para depuración
 bool depuracion=false; //1 para hacer depuración del software. 0 servicio 
 //normal. El modo depuración se usa en la fase de desarrollo del software
@@ -565,3 +583,4 @@ int Periodo[]={1000, 1000, 500, 333, 250, 200, 167, 143, 125, 111, 100, 91, 83,
 #define FSTOP              "ZP" //Mensaje de parada. Se envía para informar de parada de motor
 #define FBLUETOOTHESTADO   "YY" //void  bluetooth_estado(void)
 #define FESTADO48V         "JJ" //La cadena es 1 o 0 estado del DC/DC activo o no
+#define BME280             "UA" //Respuesta del sensor MBE280

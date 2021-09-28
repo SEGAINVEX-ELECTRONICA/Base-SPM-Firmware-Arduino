@@ -105,7 +105,7 @@ TO DO
 #include "Adafruit_Sensor.h"
 #include "PacoAdafruit_BME280.h"//Modificado por mi
 #include "SegaSCPI.h"
-#include "BaseSPM_V1_3.h"//Constantes, tipos, prototipos y variables globales
+#include "BaseSPM_V1_3_1.h"//Constantes, tipos, prototipos y variables globales
 /***********************************************************************
  * 							SETUP
  ***********************************************************************/
@@ -294,29 +294,29 @@ void timer_ADC()
 /************************************************************************
     INTERRUPCION DEL TIMER 3  para enviar datos del fotodiodo
 	Tarda 325us en enviar los datos
-	Función experimental
+	Los valores Fn, Fl, Sum se calibran con una recta de calibración
+	que tiene que ser única para cada Arduino DUE, ya que compensa
+	los errores del ADC.
  ************************************************************************/
 void timer_foto_acel()
 {
 	char respuesta[64];
-	if(FotoAcel==FOTODIODO)
+	if(FotoAcel==FOTODIODO)//FOTODIODO
 	{
-
-		
 		LED5_1
 		TEST_FOTODIODO_1 //PIN 38
 		float fl,fn,sum;
 		unsigned int fuerzaNormal,fuerzaLateral,suma;
 		//Cálculo de valores
-		fuerzaNormal=FuerzaNormal.media();
-		fn=mFn*fuerzaNormal+b_fn;//Calibrado
-		//fn=mFotoDiodo*fuerzaNormal+bFotoDiodo; //Sin calibrar
+		fuerzaNormal=FuerzaNormal.media();//Dato digital D
+		fn=mFn*fuerzaNormal+b_fn;//FN calibrado
+		//fn=mFotoDiodo*fuerzaNormal+bFotoDiodo; //FN sin calibrar
 		fuerzaLateral=FuerzaLateral.media();
-		fl=mFl*fuerzaLateral+b_fl;//Calibrado
-		//fl=mFotoDiodo*fuerzaLateral+bFotoDiodo;//Sin calibrar
-		suma=Suma.media();
-		sum=mSum*suma+b_sum;//Calibrado
-		//sum=mFotoDiodo*suma+bFotoDiodo;//Sin calibrar
+		fl=mFl*fuerzaLateral+b_fl;//FL calibrado
+		//fl=mFotoDiodo*fuerzaLateral+bFotoDiodo;//FL sin calibrar
+		suma=Suma.media();//SUM 
+		sum=mSum*suma+b_sum;//SUM calibrado
+		//sum=mFotoDiodo*suma+bFotoDiodo;//SUM sin calibrar
 		//Fin cálculo de valores
 		sprintf(respuesta,"%s %.2f %.2f %.2f",FFOTODIODO,fn,fl,sum);
 		//sprintf(respuesta,"%s %f %f %f",FFOTODIODO,fn,fl,sum);
@@ -1208,7 +1208,8 @@ void pc_sensor_temperatura_humedad(void)
 	float Humedad;
 	Temperatura = SHT11.readTemperatureC();
 	Humedad = SHT11.readHumidity();
-	sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
+	sprintf(Datos,"T%5.1f H%5.1f",Temperatura,Humedad);
+	//sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
 	// Envía valores por el puerto
 	Println(Datos)
 #endif
@@ -1218,7 +1219,8 @@ void pc_sensor_temperatura_humedad(void)
 	//DHT dht(SEN_DATA, DHT22);
 	float Humedad = dht.readHumidity();
   	float Temperatura = dht.readTemperature();
-  	sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
+	  sprintf(Datos,"T%5.1f H%5.1f",Temperatura,Humedad);
+  	//sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
 	// Check if any reads failed and exit early (to try again).
   	if (isnan(Humedad) || isnan(Temperatura))
 	{
@@ -1257,7 +1259,8 @@ void pc_sensor_temperatura_humedad(void)
 		if (Humedad < 0.0)   Humedad= 0.0;
 		if (Humedad > 100.0) Humedad = 100.0;
 		//Envía los datos por el puerto
-		sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
+		sprintf(Datos,"T%5.1f H%5.1f",Temperatura,Humedad);
+		//sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
 		Println(Datos);
 	}
 	else BaseScpi.errorscpi(24);//Error no hay sensor conectado
@@ -1269,12 +1272,43 @@ void pc_sensor_temperatura_humedad(void)
 		char Datos[128];
 		float Temperatura,Humedad;
 		bme.readHumidityTemperature(&Temperatura,&Humedad);
-		sprintf(Datos,"%s %5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
+		sprintf(Datos,"T%5.1f H%5.1f",Temperatura,Humedad);
+		//sprintf(Datos,"%s%5.1f H%5.1f",FTEMPERATURA,Temperatura,Humedad);
 		Println(Datos);
 	}
 	else BaseScpi.errorscpi(24);//Error no hay sensor conectado
  #endif	
 
+	LED3_0//digitalWrite(LED3,LOW);
+	TEST_SENSORHT_0 //digitalWrite(TEST_SENSORHT,LOW);
+	return;
+}
+/*************************************************************************
+ * Lee el sensor de temperatura y humedad BME280 y lo envia al PC.
+   Comando MOT:BM?
+**************************************************************************/
+void pc_sensor_bme280(void)
+{
+	TEST_SENSORHT_1 //pin 30 digitalWrite(TEST_SENSORHT,HIGH);
+	LED3_1 //digitalWrite(LED3,HIGH);//Para test
+	if(BaseScpi.FinComando[0]!='?')  
+	{
+		BaseScpi.errorscpi(4);//Parámetro inexistente
+		LED3_0//digitalWrite(LED3,LOW);
+		TEST_SENSORHT_0 //digitalWrite(TEST_SENSORHT,LOW);
+		return;
+	}
+ #ifdef SENSOR_BME280
+	if(statusBME280)
+	{
+		char Datos[128];
+		float Temperatura,Humedad;
+		bme.readHumidityTemperature(&Temperatura,&Humedad);
+		sprintf(Datos,"%s %4.1f H%4.1f",BME280,Temperatura,Humedad);
+		Println(Datos);
+	}
+	else BaseScpi.errorscpi(24);//Error no hay sensor conectado
+ #endif	
 	LED3_0//digitalWrite(LED3,LOW);
 	TEST_SENSORHT_0 //digitalWrite(TEST_SENSORHT,LOW);
 	return;
@@ -1322,7 +1356,7 @@ void pc_acelerometro(void)
 }
 /*************************************************************************
 		Desactiva el DC/DC de 48V
-		Comando MOT:DV 1
+		Comando MOT:AV 1
  * **********************************************************************/
 void pc_activa_48v()
 {
@@ -1560,6 +1594,17 @@ void test_step(void)
 	int per;
 	if(BaseScpi.actualizaVarEntera(&per,1000,1)==1)
 	 TIMER_CLK.start(per /* microsegundos */);
+}
+/*
+	Función para calibrar el ADC
+	Lee 2 parámetros decimales (m y b) y envía los 
+	valores de FN, FL, y SUM calculando la recta
+	con esos valores.
+*/
+void adc_calibracion(void)
+{
+	//TO DO 
+	//desarrollar esta función
 }
 /************************************************************************
 		FIN DE FUNCIONES QUE RESPONDEN A COMANDOS DEL COMPUTADOR
