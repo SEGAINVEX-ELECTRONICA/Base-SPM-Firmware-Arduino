@@ -8,8 +8,8 @@
 	
 	Aplicación para placa PCB_A con el Arduino DUE
 	Patricio Coronado. Mayo de 2019
-	Revisión Abril-mayo 2020
-	Versión 1.2
+	Revisión Abril-mayo 2020. septiembre-octubre 2021
+	Versión 2
 	NOTAS 
 	¡¡MUY IMPORTANTE!!
 	Antes de flasear asegurarse de que los puertos se inicializan
@@ -17,7 +17,7 @@
 	Bluetooth a 9600 baudios. El resto a 115200 con el nº
 	de orden en el nombre del Bluetooth BASE_SPM_XXXXXXXX 
 
-	mejoras sobre la versión 1_1:
+	cambios sobre la versión 1_1:
 	
 	-1.	Esta versión no contempla la programación del mando
 		infrarojo. 
@@ -31,12 +31,12 @@
 	-6. Anulo la función del pin del DSP DSP_48V 
 	-7. La comunicación con el mando (tablet o smartphone) se hace por Bluetooth
 	
-	mejoras sobre la versión 1_2:
+	cambios sobre la versión 1_2:
 	
 	-1.	El sensor de humedad y temperatura es definitivamente BME280 
 		y va sobre I2C.
 		
-	Modificaciones en la versión 3_1
+	cambios en la versión 3_1
 	
 	-1.	He modificado las firmas de las cadenas. Ahora son dos mayúsculas 
 		salvo temperatura-humedad que no lo he cambiado por compatibilidad.
@@ -55,16 +55,14 @@
 		en el backplane que adminte señales del DSP de 5 y 3,3V y su
 		salida es de 3,3V.
 
-TO DO
-	-0. Antes de flasear para la base definitiva verificar que 
-		los baudios para Dulcinea son 57600 y para el bluetooth
-		según la base 9600 para la primera y 115200 el resto
-	
+	Cambios en la versión 2.0
+	-1	La aplicación se actualiza para un driver de piezomotores nuevo
 
+	TO DO
 	-1. Utilizar el sensor BME280 sin librería 
 
 	
-	Ultimos cambios en el código sep 2021
+	Ultimos cambios en el código sep-oct 2021
 */
 /**************************************************************************
 	Copyright © 2020 Patricio Coronado
@@ -91,7 +89,7 @@ TO DO
 #include "Adafruit_Sensor.h" //La utiliza PacoAdafruit_BME280.h
 #include "PacoAdafruit_BME280.h"//Modificado para leer más rápido
 #include "SegaSCPI.h"
-#include "BaseSPM_V1_3_2.h"//Constantes, tipos, prototipos y variables globales
+#include "BaseSPM_V2_0.h"//Constantes, tipos, prototipos y variables globales
 /***********************************************************************
  * 							SETUP
  ***********************************************************************/
